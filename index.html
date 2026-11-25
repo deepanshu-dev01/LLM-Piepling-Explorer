@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LLM Pipeline Explorer</title>
+  <!-- Minimalist Light Theme Stylesheet (Primary Colors: Blue, Red, Yellow) -->
+  <link rel="stylesheet" href="styles.css">
+  <!-- Optional Plotly.js CDN for interactive 3D Scatter (non-blocking; falls back to pure Canvas 3D if offline) -->
+  <script async src="https://cdn.plot.ly/plotly-2.35.2.min.js" onload="if (typeof embedAndPlot === 'function') embedAndPlot();"></script>
+</head>
+<body>
+
+  <div class="container">
+
+    <!-- Top Heading in Middle -->
+    <header class="top-header">
+      <h1 class="main-title">LLM Pipeline Explorer</h1>
+      <p class="tagline">Interactive visualization of vocabulary construction, tokenization, unknown token character fallback, and 3D vector embeddings.</p>
+      
+      <div class="primary-badge-strip">
+        <span class="primary-chip blue">Primary Blue: Known Tokens</span>
+        <span class="primary-chip red">Primary Red: Token ID 0 (&lt;UNK&gt;)</span>
+        <span class="primary-chip yellow">Primary Yellow: Character Separator (#)</span>
+      </div>
+    </header>
+
+    <!-- SECTION 1: Vocabulary Test -->
+    <section class="card" id="vocabSection">
+      <div class="card-header">
+        <h2>Vocabulary test</h2>
+        <span class="step-label">Stage 1</span>
+      </div>
+      
+      <p class="section-desc">
+        A language model first builds a vocabulary from a training corpus. Below are 7 sample lines. Edit the text or click <strong>Generate vocabulary</strong> to extract all unique words, assign token IDs, and register the special unknown token <code>&lt;UNK&gt;</code> with <strong>Token ID 0</strong>.
+      </p>
+
+      <div class="corpus-container">
+        <label for="corpusInput" class="input-label">Corpus Lines (6–7 lines of source text):</label>
+        <textarea id="corpusInput" class="textarea-clean" rows="7" placeholder="Enter 6-7 lines of text..."></textarea>
+      </div>
+
+      <div class="button-row">
+        <button id="btnGenerateVocab" class="btn btn-primary-blue">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+          </svg>
+          Generate vocabulary
+        </button>
+        <button id="btnResetCorpus" class="btn btn-secondary">Reset to Default Lines</button>
+      </div>
+
+      <!-- Vocab Summary Stats -->
+      <div class="stats-banner">
+        <div class="stat-item">
+          <div class="stat-value" id="statTotalTokens">0</div>
+          <div class="stat-title">Total Words</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value" id="statUniqueVocab">0</div>
+          <div class="stat-title">Unique Vocabulary</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value red">0</div>
+          <div class="stat-title">Unknown Token ID</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value" id="statVocabMaxId">0</div>
+          <div class="stat-title">Max Token ID</div>
+        </div>
+      </div>
+
+      <!-- Vocab Table Controls -->
+      <div class="table-controls">
+        <span id="vocabCountDisplay" style="font-size: 0.88rem; color: #64748b; font-weight: 600;">Showing 0 tokens</span>
+        <input type="text" id="vocabSearch" class="input-clean search-input" placeholder="Search token or ID..." />
+      </div>
+
+      <!-- Vocabulary Output Table -->
+      <div class="table-wrapper">
+        <table class="vocab-table">
+          <thead>
+            <tr>
+              <th style="width: 140px;">Token ID</th>
+              <th>Token Name</th>
+              <th style="width: 140px;">Counts</th>
+            </tr>
+          </thead>
+          <tbody id="vocabTableBody">
+            <!-- Populated dynamically by app.js -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- SECTION 2: Sentence Tokenization & Unknown Token Decomposition -->
+    <section class="card" id="tokenizationSection">
+      <div class="card-header">
+        <h2>Sentence Tokenization &amp; Encoding</h2>
+        <span class="step-label">Stage 2</span>
+      </div>
+
+      <p class="section-desc">
+        Write a sentence below to inspect how it is tokenized against the generated vocabulary. Words in the vocabulary receive their assigned Token ID. 
+        If a word is unknown (<strong>Token ID 0</strong>), it is decomposed into individual characters separated by <strong>#</strong>, with every character assigned <strong>Token ID 0</strong>.
+      </p>
+
+      <label for="sentenceInput" class="input-label">Write or paste a sentence:</label>
+      <input 
+        type="text" 
+        id="sentenceInput" 
+        class="input-clean" 
+        value="Language models process unknown robotics algorithms" 
+        placeholder="Type a sentence here..."
+      />
+
+      <div class="quick-pills">
+        <span style="font-size: 0.8rem; font-weight: 600; color: #64748b; align-self: center;">Try sample:</span>
+        <button class="quick-pill sample-sentence-pill" data-text="Language models process natural language by breaking text into tokens.">1. All Known Words</button>
+        <button class="quick-pill sample-sentence-pill" data-text="Language models process unknown robotics algorithms">2. Mixed Known &amp; Unknown (robotics, algorithms)</button>
+        <button class="quick-pill sample-sentence-pill" data-text="Quantum cryptography optimizes supercomputer pipelines">3. All Unknown Words</button>
+      </div>
+
+      <!-- Tokenizer Stats Banner -->
+      <div class="stats-banner">
+        <div class="stat-item">
+          <div class="stat-value" id="statTokensUsed">0</div>
+          <div class="stat-title">Total Tokens Used</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value" id="statKnownTokens">0</div>
+          <div class="stat-title">Known Word Tokens</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value red" id="statUnknownTokens">0</div>
+          <div class="stat-title">Unknown Words (ID 0)</div>
+        </div>
+      </div>
+
+      <div class="token-result-box">
+        <!-- Visual Token Stream -->
+        <div class="token-stream-container">
+          <div class="token-stream-title">Visual Token Stream (with character # fallback for ID 0)</div>
+          <div id="tokenChipsContainer" class="token-chips">
+            <!-- Chips rendered dynamically -->
+          </div>
+        </div>
+
+        <!-- Token ID Sequence Array -->
+        <div>
+          <div class="token-stream-title">Token IDs of Tokens in Line</div>
+          <div id="tokenSequenceBox" class="id-sequence-box">[ ]</div>
+        </div>
+
+        <!-- Detailed Token Breakdown Table -->
+        <div style="margin-top: 24px;">
+          <div class="token-stream-title">Token Inspection Breakdown</div>
+          <div class="table-wrapper" style="max-height: 240px;">
+            <table class="vocab-table">
+              <thead>
+                <tr>
+                  <th style="width: 70px;">Order</th>
+                  <th>Word</th>
+                  <th style="width: 170px;">Status</th>
+                  <th style="width: 150px;">Assigned ID</th>
+                  <th>Representation</th>
+                </tr>
+              </thead>
+              <tbody id="sentenceTokenTableBody">
+                <!-- Rows populated dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 3: Vector Embedding & 3D Interactive Plot -->
+    <section class="card" id="embeddingSection">
+      <div class="card-header">
+        <h2>Vector Embedding</h2>
+        <span class="step-label">Stage 3</span>
+      </div>
+
+      <p class="section-desc">
+        Explore how sentences are mapped into continuous vector space. Choose between <strong>Spelling based</strong> (orthographic character n-grams) or <strong>Meaning based</strong> (semantic concept vectors), then click <strong>Embed and plot</strong> to visualize all sentences in the interactive 3D chart.
+      </p>
+
+      <!-- 7-8 Sentences Editor -->
+      <div class="sentences-editor">
+        <label class="input-label">7–8 Sentences for Embedding (Grouped by Conceptual Domain):</label>
+        <div id="sentencesEditorList">
+          <!-- Populated dynamically with 8 sentences -->
+        </div>
+      </div>
+
+      <!-- Embedding Mode Options -->
+      <div class="options-group">
+        <div class="options-title">Select Embedding Representation:</div>
+        <div class="radio-pills">
+          <label class="radio-label active" for="optMeaning">
+            <input type="radio" id="optMeaning" name="embeddingOption" value="meaning" checked>
+            <div>
+              <div>Meaning based</div>
+              <span class="radio-desc">Semantic concepts &amp; contextual proximity (King ≈ Queen, Pasta ≈ Pizza)</span>
+            </div>
+          </label>
+
+          <label class="radio-label" for="optSpelling">
+            <input type="radio" id="optSpelling" name="embeddingOption" value="spelling">
+            <div>
+              <div>Spelling based</div>
+              <span class="radio-desc">Character frequency &amp; letter n-grams (shared characters cluster together)</span>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <!-- Downside Button -->
+      <div class="button-row">
+        <button id="btnEmbedPlot" class="btn btn-primary-blue">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <polygon points="12 8 8 12 12 16 12 8"/>
+            <line x1="16" y1="12" x2="12" y2="12"/>
+          </svg>
+          Embed and plot
+        </button>
+      </div>
+
+      <!-- 3D Chart Container -->
+      <div class="chart-container-card">
+        <div class="chart-header">
+          <div class="chart-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+              <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+              <line x1="12" y1="22.08" x2="12" y2="12"/>
+            </svg>
+            Interactive 3D Sentence Embedding Space
+          </div>
+          <span id="chartModeTag" class="chart-mode-pill meaning">Meaning-Based Semantic Projection</span>
+        </div>
+
+        <div id="chart3d">
+          <!-- 3D Plotly or Fallback Canvas renders here -->
+        </div>
+
+        <div class="chart-legend-row">
+          <div class="legend-item">
+            <span class="legend-dot" style="background: #1d4ed8;"></span>
+            <span>Royal / Governance (Blue)</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-dot" style="background: #ca8a04;"></span>
+            <span>Animals / Pets (Yellow)</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-dot" style="background: #2563eb;"></span>
+            <span>Technology / AI (Indigo)</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-dot" style="background: #dc2626;"></span>
+            <span>Food / Culinary (Red)</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="callout-box" id="embeddingsInsight">
+        <strong>Semantic Vector Insight:</strong> Notice how <em>S1 &amp; S2 (Royalty)</em> cluster tightly together, 
+        <em>S3 &amp; S4 (Animals/Pets)</em> group closely, <em>S5 &amp; S6 (Technology/AI)</em> form a distinct cluster, and 
+        <em>S7 &amp; S8 (Food/Italian Cuisine)</em> group together. Even though the word spellings differ substantially, 
+        the language model vectors preserve semantic proximity!
+      </div>
+    </section>
+
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
